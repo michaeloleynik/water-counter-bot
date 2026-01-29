@@ -3,6 +3,7 @@ import multer from 'multer';
 import { userService } from '../services/UserService';
 import { deviceService } from '../services/DeviceService';
 import { readingService } from '../services/ReadingService';
+import { invitationService } from '../services/InvitationService';
 import { fileHelper } from '../utils/fileHelper';
 
 const router = express.Router();
@@ -45,6 +46,23 @@ router.get('/devices', authenticateUser, async (req: Request, res: Response) => 
     res.json(devices);
   } catch (error) {
     console.error('Error fetching devices:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Получение последнего показания для аппарата
+router.get('/devices/:deviceId/last-reading', authenticateUser, async (req: Request, res: Response) => {
+  try {
+    const deviceId = parseInt(req.params.deviceId);
+    const lastReading = await readingService.getLatestReading(deviceId);
+    
+    if (!lastReading) {
+      return res.json({ counter_value: null });
+    }
+    
+    res.json(lastReading);
+  } catch (error) {
+    console.error('Error fetching last reading:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -140,6 +158,112 @@ router.get('/me', authenticateUser, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error fetching user info:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ===== ADMIN ENDPOINTS =====
+
+// Middleware для проверки прав администратора
+const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  const user = (req as any).user;
+  if (!user || user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+};
+
+// Создание нового аппарата (только для админов)
+router.post('/admin/devices', authenticateUser, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { name, location, serial_number, description } = req.body;
+    const user = (req as any).user;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const device = await deviceService.create({
+      name,
+      location: location || undefined,
+      serial_number: serial_number || undefined,
+      description: description || undefined,
+      created_by: user.id
+    });
+
+    res.status(201).json(device);
+  } catch (error) {
+    console.error('Error creating device:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Получение списка пользователей (только для админов)
+router.get('/admin/users', authenticateUser, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const users = await userService.getAllUsers();
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Создание приглашения (только для админов)
+router.post('/admin/invitations', authenticateUser, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { role } = req.body;
+    const user = (req as any).user;
+
+    if (!role || !['admin', 'employee'].includes(role)) {
+      return res.status(400).json({ error: 'Valid role is required (admin or employee)' });
+    }
+
+    const invitation = await invitationService.create(
+      user.id,
+      role as 'admin' | 'employee'
+    );
+
+    res.status(201).json(invitation);
+  } catch (error) {
+    console.error('Error creating invitation:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Деактивация пользователя (только для админов)
+router.delete('/admin/users/:id', authenticateUser, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const currentUser = (req as any).user;
+
+    if (userId === currentUser.id) {
+      return res.status(400).json({ error: 'Cannot deactivate yourself' });
+    }
+
+    await userService.deactivateUser(userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deactivating user:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Получение показаний по аппарату с фильтрацией (только для админов)
+router.get('/admin/readings/device/:deviceId', authenticateUser, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const deviceId = parseInt(req.params.deviceId);
+    const { start_date, end_date } = req.query;
+
+    const readings = await readingService.getByDeviceWithFilters(
+      deviceId,
+      start_date as string | undefined,
+      end_date as string | undefined
+    );
+
+    res.json(readings);
+  } catch (error) {
+    console.error('Error fetching readings:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

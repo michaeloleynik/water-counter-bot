@@ -114,6 +114,21 @@ export class ReadingService {
     return result.rows[0] || null;
   }
 
+  async getByDeviceWithFilters(
+    deviceId: number,
+    startDate?: string,
+    endDate?: string
+  ): Promise<ReadingWithDetails[]> {
+    if (startDate && endDate) {
+      return this.getByDeviceAndDateRange(
+        deviceId,
+        new Date(startDate),
+        new Date(endDate)
+      );
+    }
+    return this.getByDevice(deviceId, 100);
+  }
+
   async updateSyncStatus(id: number, status: 'pending' | 'synced' | 'failed'): Promise<void> {
     await query(
       'UPDATE readings SET sync_status = $1 WHERE id = $2',

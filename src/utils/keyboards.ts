@@ -2,7 +2,8 @@ import { Markup } from 'telegraf';
 
 export const mainMenuKeyboard = (isAdmin: boolean) => {
   const buttons = [
-    [Markup.button.callback('📝 Загрузить показания', 'add_reading')],
+    [Markup.button.webApp('📱 Открыть Mini App', process.env.WEBAPP_URL || 'https://your-mini-app-url.com')],
+    [Markup.button.callback('📝 Загрузить в боте', 'add_reading')],
     [Markup.button.callback('📊 Мои показания', 'my_readings')],
   ];
 

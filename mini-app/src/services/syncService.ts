@@ -116,8 +116,9 @@ export class SyncService {
     // Пытаемся синхронизировать сразу
     setTimeout(() => {
       // Получаем userId из Telegram Web App
-      if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-        this.syncReadings(window.Telegram.WebApp.initDataUnsafe.user.id);
+      const tgUserId = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id;
+      if (tgUserId) {
+        this.syncReadings(tgUserId);
       }
     }, 100);
 
